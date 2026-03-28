@@ -7,6 +7,8 @@ interface Recipe {
   title: string;
   ingredients: string[];
   steps: string[];
+  isAiGenerated: boolean;
+  sourceUrl?: string;
 }
 
 export default function SemanticRecipeFinder() {
@@ -15,33 +17,39 @@ export default function SemanticRecipeFinder() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isCookMode, setIsCookMode] = useState(false);
 
-  const handleFindRecipe = () => {
+  const handleFindRecipe = async () => {
     if (!query.trim()) return;
     
     setIsLoading(true);
     setRecipe(null);
     setIsCookMode(false);
 
-    // Simulate AI thinking for 3 seconds
-    setTimeout(() => {
-      setIsLoading(false);
-      setRecipe({
-        title: "Lemon Dill Tilapia with Crispy Kale",
-        ingredients: [
-          "2 frozen tilapia fillets",
-          "1 bunch wilted kale, chopped",
-          "1 lemon, juiced and zested",
-          "2 tbsp olive oil",
-          "Salt and pepper to taste"
-        ],
-        steps: [
-          "Preheat oven to 400°F (200°C). Toss the chopped kale with 1 tbsp olive oil, salt, and pepper. Spread on a baking sheet and roast for 10 minutes until crispy.",
-          "While kale is roasting, heat 1 tbsp olive oil in a skillet over medium-high heat. Season tilapia with salt, pepper, and lemon zest.",
-          "Cook tilapia for 3-4 minutes per side until flaky. Drizzle with fresh lemon juice and serve immediately over the crispy kale."
-        ]
+    try {
+      // We now call our secure backend route instead of the Gemini API directly
+      const response = await fetch('/api/recipe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
       });
-    }, 3000);
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      setRecipe(data);
+      
+    } catch (error) {
+      console.error("Failed to fetch recipe:", error);
+      alert("Oops! Our AI chef had a hiccup. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // --- EVERYTHING BELOW THIS LINE IS UNCHANGED --- //
 
   if (isCookMode && recipe) {
     return (
@@ -156,13 +164,22 @@ export default function SemanticRecipeFinder() {
         {/* Recipe Result Section */}
         {recipe && !isLoading && (
           <section className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-            {/* Warning Banner */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-8 flex items-start gap-3 text-amber-800">
-              <AlertTriangle className="w-6 h-6 flex-shrink-0 text-amber-500 mt-0.5" />
-              <p className="text-sm md:text-base font-medium leading-relaxed">
-                <strong>AI-Generated Recipe:</strong> We couldn&apos;t find an exact match online, so our AI Chef improvised!
-              </p>
-            </div>
+            {/* Warning Banner or Source Link */}
+            {recipe.isAiGenerated ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-8 flex items-start gap-3 text-amber-800">
+                <AlertTriangle className="w-6 h-6 flex-shrink-0 text-amber-500 mt-0.5" />
+                <p className="text-sm md:text-base font-medium leading-relaxed">
+                  <strong>AI-Generated Recipe:</strong> We couldn&apos;t find an exact match online, so our AI Chef improvised!
+                </p>
+              </div>
+            ) : recipe.sourceUrl ? (
+              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 mb-8 flex items-center gap-3 text-stone-600">
+                <Search className="w-5 h-5 flex-shrink-0 text-stone-400" />
+                <p className="text-sm md:text-base font-medium">
+                  <strong>Source:</strong> Found online at <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline break-all">{recipe.sourceUrl}</a>
+                </p>
+              </div>
+            ) : null}
 
             {/* Recipe Card */}
             <div className="bg-white rounded-3xl shadow-lg shadow-stone-200/50 border border-stone-100 overflow-hidden">
