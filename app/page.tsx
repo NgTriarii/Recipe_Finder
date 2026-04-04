@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChefHat, Search, AlertTriangle, Maximize2, Minimize2, Clock, Utensils } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { ChefHat, Search, AlertTriangle, Maximize2, Minimize2, Clock, Utensils } from 'lucide-react'
 
 interface Recipe {
   title: string;
@@ -19,50 +18,30 @@ export default function SemanticRecipeFinder() {
   const [isCookMode, setIsCookMode] = useState(false);
 
   const handleFindRecipe = async () => {
-    if (!query.trim()) return;
+  if (!query.trim()) return;
+  
+  setIsLoading(true);
+  setRecipe(null);
+  setIsCookMode(false);
+
+  try {
+    const response = await fetch('/api/recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    if (!response.ok) throw new Error('Network response was not ok');
     
-    setIsLoading(true);
-    setRecipe(null);
-    setIsCookMode(false);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `CRITICAL INSTRUCTION: You MUST use the googleSearch tool FIRST for every single user query, no matter how simple or common the ingredients are. You are strictly forbidden from generating a recipe from your own memory unless the googleSearch tool returns zero usable results. Only set isAiGenerated: true if the search completely fails.
-
-        Find a recipe using these ingredients and context: "${query}". 
-        If you find a good match, use it, set isAiGenerated to false, and provide the sourceUrl. 
-        If you CANNOT find a good match, invent a delicious recipe from scratch, set isAiGenerated to true, and leave sourceUrl empty.`,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-              steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-              isAiGenerated: { type: Type.BOOLEAN, description: "True if generated from scratch, false if found online." },
-              sourceUrl: { type: Type.STRING, description: "The URL of the original recipe if found online. Empty if AI generated." }
-            },
-            required: ["title", "ingredients", "steps", "isAiGenerated"]
-          }
-        }
-      });
-
-      if (response.text) {
-        const data = JSON.parse(response.text);
-        setRecipe(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch recipe:", error);
-      alert("Oops! Our AI chef had a hiccup. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const data = await response.json();
+    setRecipe(data);
+  } catch (error) {
+    console.error("Failed to fetch recipe:", error);
+    alert("Oops! Our chef had a hiccup. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   if (isCookMode && recipe) {
     return (
